@@ -7,6 +7,8 @@ import (
 	"net/http/httputil"
 	"encoding/json"
 	"urlserver/requestutils"
+	"urlserver/bidder"
+	"urlserver/reducer"
 	"github.com/garyburd/redigo/redis"
 )
 
@@ -22,9 +24,13 @@ func newRedisPool() *redis.Pool {
 	}
 }
 
+const BUFFER_SIZE = 10
+
 var (
 	nextReqId = 1
 	pool = newRedisPool()
+	bidding = make(chan int, BUFFER_SIZE)
+	reducing = make(chan int, BUFFER_SIZE)
 )
 
 func requestHandler(w http.ResponseWriter, r *http.Request) {
@@ -46,6 +52,7 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		requestutils.Save(conn, id, request)
+		bidding <- id
 	} else {
 		id, err := strconv.Atoi(reqId)
 		if err != nil {
@@ -58,7 +65,10 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if request.Status == requestutils.COMPLETE {
-			result := json.MarshalIndent(request.Result, "", "    ")
+			result, err := json.MarshalIndent(request.Result, "", "    ")
+			if err != nil {
+				panic(err)
+			}
 			w.Header().Set("Content-Type", "application/json")
 			w.Write(result)
 		} else {
@@ -76,6 +86,9 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	go bidder.Run(bidding, reducing)
+	go reducer.Run(reducing)
+
 	conn := pool.Get()
 	defer conn.Close()
 
