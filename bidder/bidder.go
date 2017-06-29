@@ -21,7 +21,7 @@ func newRedisPool() *redis.Pool {
 
 var pool = newRedisPool()
 
-func getHttpResponseCode(url string, c chan *requestutils.UrlInfo) {
+func GetHttpResponseCode(url string, c chan *requestutils.UrlInfo) {
 	client := http.Client{Timeout: time.Duration(5*time.Second)}
 	resp, err := client.Get(url)
 	if err != nil {
@@ -48,7 +48,7 @@ func Run(bidding, reducing chan int) {
 			num_urls := len(request.InputUrls)
 			completed := make(chan *requestutils.UrlInfo, len(request.InputUrls))
 			for _, v := range request.InputUrls {
-				go getHttpResponseCode(v.Url, completed)
+				go GetHttpResponseCode(v.Url, completed)
 			}
 
 			request.InputUrls = []requestutils.UrlInfo{}
@@ -58,7 +58,6 @@ func Run(bidding, reducing chan int) {
 					select {
 					case resp := <-completed:
 						request.InputUrls = append(request.InputUrls, *resp)
-						// fmt.Printf("%T %+v\n", request.InputUrls, request.InputUrls)
 						if len(request.InputUrls) == num_urls {
 							request.Status = requestutils.REDUCING
 							requestutils.Save(conn, reqId, request)

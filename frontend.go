@@ -1,19 +1,19 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	"strconv"
+	"github.com/garyburd/redigo/redis"
 	"net/http"
 	"net/http/httputil"
-	"encoding/json"
-	"urlserver/requestutils"
+	"strconv"
 	"urlserver/bidder"
 	"urlserver/reducer"
-	"github.com/garyburd/redigo/redis"
+	"urlserver/requestutils"
 )
 
 func newRedisPool() *redis.Pool {
-	return &redis.Pool {
+	return &redis.Pool{
 		Dial: func() (redis.Conn, error) {
 			c, er := redis.Dial("tcp", ":6379")
 			if er != nil {
@@ -28,16 +28,16 @@ const BUFFER_SIZE = 10
 
 var (
 	nextReqId = 1
-	pool = newRedisPool()
-	bidding = make(chan int, BUFFER_SIZE)
-	reducing = make(chan int, BUFFER_SIZE)
+	pool      = newRedisPool()
+	bidding   = make(chan int, BUFFER_SIZE)
+	reducing  = make(chan int, BUFFER_SIZE)
 )
 
 func requestHandler(w http.ResponseWriter, r *http.Request) {
 	data, _ := httputil.DumpRequest(r, true)
-    fmt.Println(string(data))
+	fmt.Println(string(data))
 
-    conn := pool.Get()
+	conn := pool.Get()
 	defer conn.Close()
 
 	reqId := r.URL.Path[len("/requests/"):]
@@ -49,6 +49,7 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 		request, err := requestutils.CreateObjectFromFile(r)
 		if err != nil {
 			fmt.Fprintf(w, "Bad data")
+			fmt.Printf("%T %v", err, err)
 			return
 		}
 		requestutils.Save(conn, id, request)
